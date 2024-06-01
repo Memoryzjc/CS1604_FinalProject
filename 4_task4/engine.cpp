@@ -1,12 +1,9 @@
 #include <sstream>
 #include <string>
-#include <iomanip>
 #include <cassert>
-#include <Queue.h>
 #include "engine.h"
 #include "units.h"
 #include "vector.h"
-#include "Stack.h"
 #include "algorithms.h"
 
 using namespace std;
@@ -480,7 +477,7 @@ void attack(Field & field, int gRow, int gCol, Vector<Unit*> & units) {
 
     // up
     if (field.inBounds(gRow - 1, gCol)) {
-        u = field.getUnit(gRow - 1, gCol);u = field.getUnit(gRow - 1, gCol);
+        u = field.getUnit(gRow - 1, gCol);
         if (u != nullptr && u->getSide()) {
             for (auto & unit : units) {
                 if (unit == u) {

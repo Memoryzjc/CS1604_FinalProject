@@ -1,5 +1,4 @@
 #include <iostream>
-#include <fstream>
 #include "field.h"
 #include "units.h"
 #include "engine.h"
