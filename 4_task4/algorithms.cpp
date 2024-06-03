@@ -89,6 +89,7 @@ std::pair<int, Vector<point>> searchShortestPath(const Field & field, int row, i
                 }
                 continue;
             }
+            else continue;
         }
         
         // enqueue four directions of p to the queue
