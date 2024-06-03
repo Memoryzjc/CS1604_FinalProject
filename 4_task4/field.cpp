@@ -46,7 +46,7 @@ bool Field::setUnit(int row, int col, Unit* u)
 {
     assert (units.inBounds(row, col));
 
-    if (units[row][col] == nullptr) {
+    if (units[row][col] == nullptr && terrains[row][col] == PLAIN) {
         units[row][col] = u;
         return true;
     }
@@ -148,7 +148,7 @@ void Field::setTerrain(int row, int col, Terrain t)
 // Reclaim all the units
 Field::~Field()
 {
-    // Implement it if your want to delete the units via [field] instead of [units]
+    for (auto & unit : units) delete unit;
 }
 
 

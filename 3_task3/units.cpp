@@ -6,6 +6,12 @@ using namespace std;
 /* Unit */
 
 // Constructor
+Unit::Unit(bool sd, int r, int c, UnitType t, int sr)
+: side(sd), row(r), col(c), type(t), sightRange(sr), pDir(Still)
+{
+
+}
+
 Unit::Unit(bool sd, int r, int c, UnitType t, PatrolDirection pDir, int aPoint)
 : side(sd), row(r), col(c), type(t), pDir(pDir)
 {
@@ -32,7 +38,7 @@ Unit::Unit(bool sd, int r, int c)
 }
 
 Unit::Unit()
-: side(true), row(0), col(0), type(Mage), pDir(Still), actionPoint(3)
+: type(Mage), pDir(Still)
 {
 
 }
@@ -63,22 +69,22 @@ void Unit::setCol(int c)
 {
     col = c;
 }
-
+/*
 void Unit::setSide(bool s)
 {
     side = s;
 }
-
+*/
 UnitType Unit::getType() const
 {
     return type;
 }
-
+/*
 void Unit::setType(UnitType t)
 {
     type = t;
 }
-
+*/
 PatrolDirection Unit::getPatrolDir() const
 {
     return pDir;
@@ -93,12 +99,22 @@ int Unit::getActionPoint() const
 {
     return actionPoint;
 }
-
+/*
 void Unit::setActionPoint(int ap)
 {
     actionPoint = ap;
 }
-
+*/
+int Unit::getSightRange() const
+{
+    return sightRange;
+}
+/*
+void Unit::setSightRange(int sr)
+{
+    sightRange = sr;
+}
+*/
 // Get the symbol of the unit
 string getUnitSymbol(const Unit& u)
 {

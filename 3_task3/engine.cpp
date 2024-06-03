@@ -1,12 +1,9 @@
 #include <sstream>
 #include <string>
-#include <iomanip>
 #include <cassert>
-#include <Queue.h>
 #include "engine.h"
 #include "units.h"
 #include "vector.h"
-#include "Stack.h"
 #include "algorithms.h"
 
 using namespace std;
@@ -15,16 +12,27 @@ bool debugMode = true;
 
 enum Site {UL = 0, U, UR, L, R, DL, D, DR};
 
+// judge whether a string is all composed of digit and is not empty
+bool isDigit(string s) {
+    if (s.empty()) return false;
+
+    for (char c : s) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
+
 
 // need to find all the situation that will lead to failure
 // Load map and units
 Field* loadMap(istream& is, Vector<Unit*>& units)
 {
-    int row, col, tNum, mNum, gNum;
+    int row, col, tNum = -1, mNum = -1, gNum = -1;
     string line;
     getline(is, line);
     istringstream iss1(line);
     iss1 >> row >> col >> tNum >> mNum >> gNum;
+    if (tNum < 0 || mNum < 0 || gNum < 0) return nullptr;
 
     Field *battlefield;
     battlefield = new Field(row, col);
@@ -37,14 +45,16 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
         getline(is, line);
         istringstream iss2(line);
         if (count <= tNum + 1) {  // generate terrains
-            int tRow, tCol;
-            char terrain;
+            string tRow, tCol, terrain;
             Terrain t;
             iss2 >> tRow >> tCol >> terrain;
 
-            if (terrain != 'W' && terrain != 'M') return nullptr;
+            // guarantee tRow and tCol is integer
+            if (!isDigit(tRow) || !isDigit(tCol)) return nullptr;
+            // guarantee terrain is 'W' or 'M'
+            if ((terrain[0] != 'W' && terrain[0] != 'M') || terrain.length() != 1) return nullptr;
 
-            switch (terrain) {
+            switch (terrain[0]) {
                 case('W'):
                     t = WATER;
                     break;
@@ -56,35 +66,66 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
                     break;
             }
 
-            battlefield->setTerrain(tRow, tCol, t);
-        } else if (count > tNum + 1 && count <= tNum + mNum + 1) {
-            int mRow, mCol;  // generate mages
-            iss2 >> mRow >> mCol;
-            Unit *u = new Unit(true, mRow, mCol);
-            units.add(u);  // add mages to the units
-            battlefield->setUnit(mRow, mCol, u);
-        } else {
-            int gRow, gCol, ap;  // generate goblins
-            string t;
-            char dir;
+            // if (tRow, tCol) has already occupied by special terrain, map fails to load
+            if (battlefield->getTerrain(stoi(tRow), stoi(tCol)) != PLAIN) return nullptr;
+            else battlefield->setTerrain(stoi(tRow), stoi(tCol), t);
+        }
+        else if (count > tNum + 1 && count <= tNum + mNum + 1) {
+            // generate mages
+            string mRow, mCol, check;
+            iss2 >> mRow >> mCol >> check;
 
-            iss2 >> gRow >> gCol >> t >> dir >> ap;
+            // guarantee mRow and mCol are digits and not empty
+            if (!isDigit(mRow) || !isDigit(mCol)) return nullptr;
+            // guarantee input is the mage's form
+            if (!check.empty()) return nullptr;
 
-            UnitType gType;
-            if (t == "PG") gType = Patrol;
-            else if (t == "TG") gType = Tracking;
-            else return nullptr;
+            Unit *u = new Unit(true, stoi(mRow), stoi(mCol));
 
-            Unit *u = new Unit(false, gRow, gCol, gType,
-                               static_cast<PatrolDirection>(dir), ap);
+            // add mages to the units
+            units.add(u);
+            // if (mRow, mCol) is occupied, return nullptr
+            if(!battlefield->setUnit(stoi(mRow), stoi(mCol), u)) return nullptr;
+        }
+        else {
+            // generate goblins
+            string gRow, gCol, ap, sightRange, t, dir;
 
-            units.add(u);  // add mages to the units
-            battlefield->setUnit(gRow, gCol, u);
+            iss2 >> gRow >> gCol >> t;
+            // guarantee gRow and gCol are digits
+            if (!isDigit(gRow) || !isDigit(gCol)) return nullptr;
+
+            if (t == "PG") {
+                iss2 >> dir >> ap;
+
+                // guarantee ap is digit and dir is a char
+                if (!isDigit(ap) || dir.length() != 1) return nullptr;
+                // guarantee dir is a valid direction
+                if (dir[0] != 'W' && dir[0] != 'A' &&
+                    dir[0] != 'S' && dir[0] != 'D') return nullptr;
+
+                Unit *u = new Unit(false, stoi(gRow), stoi(gCol), Patrol,
+                                   static_cast<PatrolDirection>(dir[0]), stoi(ap));
+                units.add(u);  // add mages to the units
+
+                // guarantee (gRow, gCol) is not occupied
+                if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
+            }
+            else if (t == "TG") {
+                iss2 >> sightRange;
+
+                // guarantee sightRange is digit
+                if(!isDigit(sightRange)) return nullptr;
+
+                Unit *u = new Unit(false, stoi(gRow), stoi(gCol), Tracking, stoi(sightRange));
+
+                units.add(u);  // add mages to the units
+                if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
+            }
+            else return nullptr;  // guarantee t equals PG or TG
         }
 
     }
-
-
     return battlefield;
 }
 
@@ -390,8 +431,6 @@ void castTornado(Field& field, Unit *mage, Vector<Unit*>& units) {
     }
 }
 
-
-
 // move mages and cast spell
 void mageAction(Field& field, Unit *mage, const Vector<char>& commands, Vector<Unit*>& units) {
     int n = commands.size();
@@ -442,6 +481,7 @@ void mageAction(Field& field, Unit *mage, const Vector<char>& commands, Vector<U
     }
 }
 
+// find whether the adjacent point has a mage
 bool findMage(Field & field, int gRow, int gCol) {
     Unit *u;
     if (field.inBounds(gRow - 1, gCol)) {
@@ -467,60 +507,67 @@ bool findMage(Field & field, int gRow, int gCol) {
     return false;
 }
 
-
 // implement the attack of goblins
 void attack(Field & field, int gRow, int gCol, Vector<Unit*> & units) {
-    Unit *u;   // up
-    u = field.getUnit(gRow - 1, gCol);
+    Unit *u;
 
     // up
-    if (u != nullptr && u->getSide()) {
-        for (auto & unit : units) {
-            if (unit == u) {
-                unit = nullptr;
-                break;
+    if (field.inBounds(gRow - 1, gCol)) {
+        u = field.getUnit(gRow - 1, gCol);
+        if (u != nullptr && u->getSide()) {
+            for (auto & unit : units) {
+                if (unit == u) {
+                    unit = nullptr;
+                    break;
+                }
             }
+            field.removeUnit(gRow - 1, gCol);
         }
-        field.removeUnit(gRow - 1, gCol);
     }
 
     // down
-    u = field.getUnit(gRow + 1, gCol);
-    if (u != nullptr && u->getSide()) {
-        for (auto & unit : units) {
-            if (unit == u) {
-                unit = nullptr;
-                break;
+    if (field.inBounds(gRow + 1, gCol)) {
+        u = field.getUnit(gRow + 1, gCol);
+        if (u != nullptr && u->getSide()) {
+            for (auto & unit : units) {
+                if (unit == u) {
+                    unit = nullptr;
+                    break;
+                }
             }
+            field.removeUnit(gRow + 1, gCol);
         }
-        field.removeUnit(gRow + 1, gCol);
     }
 
     // left
-    u = field.getUnit(gRow, gCol - 1);
-    if (u != nullptr && u->getSide()) {
-        for (auto & unit : units) {
-            if (unit == u) {
-                unit = nullptr;
-                break;
+    if (field.inBounds(gRow, gCol - 1)) {
+        u = field.getUnit(gRow, gCol - 1);
+        if (u != nullptr && u->getSide()) {
+            for (auto & unit : units) {
+                if (unit == u) {
+                    unit = nullptr;
+                    break;
+                }
             }
+            field.removeUnit(gRow, gCol - 1);
         }
-        field.removeUnit(gRow, gCol - 1);
     }
 
     // right
-    u = field.getUnit(gRow, gCol + 1);
-    if (u != nullptr && u->getSide()) {
-        for (auto & unit : units) {
-            if (unit == u) {
-                unit = nullptr;
-                break;
+    if (field.inBounds(gRow, gCol + 1)) {
+        u = field.getUnit(gRow, gCol + 1);
+        if (u != nullptr && u->getSide()) {
+            for (auto & unit : units) {
+                if (unit == u) {
+                    unit = nullptr;
+                    break;
+                }
             }
+            field.removeUnit(gRow, gCol + 1);
         }
-        field.removeUnit(gRow, gCol + 1);
     }
-}
 
+}
 
 // implement the action of patrol goblin
 void patrolGoblinAction(Field & field, Unit* goblin, Vector<Unit*> & units) {
@@ -629,6 +676,97 @@ void patrolGoblinAction(Field & field, Unit* goblin, Vector<Unit*> & units) {
 }
 
 
+// search all mages within the tracking goblin's sight
+Vector<Unit*> searchMage(Field & field, Unit* tGoblin) {
+    int gRow = tGoblin->getRow(), gCol = tGoblin->getCol();
+    int sightR = tGoblin->getSightRange();
+    int fieldH = field.getHeight(), fieldL = field.getWidth();
+    Vector<Unit*> mages;
+
+    // determine the search range
+    int rowS = gRow - min(gRow, sightR), rowE = gRow + min(fieldH - gRow, sightR) - 1;
+    int colS = gCol - min(gCol, sightR), colE = gCol + min(fieldL - gCol, sightR) - 1;
+
+    // search within the range
+    for (int i = rowS; i <= rowE; i++) {
+        for (int j = colS; j <= colE; j++) {
+            if (abs(i - gRow) + abs(j - gCol) > sightR
+                || field.getUnit(i, j) == nullptr) continue;
+            else {
+                if (field.getUnit(i, j)->getSide())
+                    mages.add(field.getUnit(i, j));
+            }
+        }
+    }
+
+    return mages;
+}
+
+
+// implement the action of tracking goblin
+void trackingGoblinAction(Field & field, Unit* tGoblin, Vector<Unit*> & units) {
+    // step 1: search all mages within its sight
+    Vector<Unit*> mages = searchMage(field, tGoblin);
+    if (mages.size() == 0) return;
+
+    // step 2: find the nearest mage and figure out the path
+    int gRow = tGoblin->getRow(), gCol = tGoblin->getCol();
+    pair<int, Vector<point>> shortestPath =
+            searchShortestPath(field, gRow, gCol, mages[0]->getRow(), mages[0]->getCol());
+    // paths: store the shortest path to every reachable mage
+    // nearestMage: store the nearest mages
+    Vector<pair<int, Vector<point>>> paths, nearestMage;
+
+
+    // find the nearest mage
+    // and store the shortest way to
+    // every reachable mage within the sight individually
+     for (int i = 0; i < mages.size(); i++) {
+        pair<int, Vector<point>> path =
+                searchShortestPath(field, gRow, gCol, mages[i]->getRow(), mages[i]->getCol());
+        if (path.first != -1) {
+            paths.add(path);
+            if (path.first < shortestPath.first) shortestPath = path;
+        }
+    }
+
+    // find the number of nearest mages and store the path to nearestMage
+    for (auto path: paths) {
+        if (path.first == shortestPath.first) nearestMage.add(path);
+    }
+
+    // step 3: use the path to find and attack the mage
+    if (nearestMage.size() == 0) return;
+    else if (nearestMage.size() == 1) {
+        Vector<point> way = nearestMage[0].second;
+        int tRow = way[max(way.size() - 2, 0)].first, tCol = way[max(way.size() - 2, 0)].second;
+        field.exchangeUnit(gRow, gCol, tRow, tCol);
+        attack(field, tRow, tCol, units);
+        return;
+    }
+    else {
+        Vector<point> way = nearestMage[0].second, target = way;
+        int tRow = way[way.size() - 1].first, tCol = way[way.size() - 1].second;
+
+        // find the smallest partial order
+        for (int i = 1; i < nearestMage.size(); i++) {
+            way = nearestMage[i].second;
+            if (coordOrder(way[way.size() - 1].first, way[way.size() - 1].second, tRow, tCol)) {
+                tRow = way[way.size() - 1].first;
+                tCol = way[way.size() - 1].second;
+                target = way;
+            }
+        }
+
+        field.exchangeUnit(gRow, gCol,
+                           target[max(target.size() - 2, 0)].first,
+                           target[max(target.size() - 2, 0)].second);
+        attack(field, target[max(target.size() - 2, 0)].first,
+               target[max(target.size() - 2, 0)].second, units);
+    }
+}
+
+
 // implement the action of goblins
 void goblinAction(Field & field, Unit* goblin, Vector<Unit*> & units) {
     UnitType t = goblin->getType();
@@ -638,6 +776,7 @@ void goblinAction(Field & field, Unit* goblin, Vector<Unit*> & units) {
             break;
         }
         case (Tracking): {
+            trackingGoblinAction(field, goblin, units);
             break;
         }
         default: break;
@@ -670,7 +809,11 @@ void play(Field& field, istream& is, ostream& os, Vector<Unit*>& units)
         // Print the new map
         os << field << endl;
 
-        if (playerWin(units)) {
+        if (units.isEmpty()) {
+            cout << "A Draw!";
+            break;
+        }
+        else if (playerWin(units)) {
             cout << "You Win!";
             break;
         }

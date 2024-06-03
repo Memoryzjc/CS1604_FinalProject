@@ -14,6 +14,7 @@ class Unit {
 public:
 
     // Constructor
+    Unit(bool sd, int r, int c, UnitType t, int sr);
     Unit(bool sd, int row, int col, UnitType type, PatrolDirection pDir, int actionPoint);
     Unit(bool sd, int row, int col, UnitType type, PatrolDirection pDir);
     Unit(bool sd, int row, int col, UnitType type);
@@ -22,7 +23,7 @@ public:
 
     // Check which side the unit belongs to
     bool getSide() const;
-    void setSide(bool s);
+    // void setSide(bool s);
 
     // Get and set row(col) of the unit
     int getRow() const;
@@ -33,7 +34,7 @@ public:
 
     // get and set the type of the unit
     UnitType getType() const;
-    void setType(UnitType type);
+    // void setType(UnitType type);
 
     // get and set the patrol direction of goblin
     PatrolDirection getPatrolDir() const;
@@ -41,16 +42,21 @@ public:
 
     // get and set the action point of unit
     int getActionPoint() const;
-    void setActionPoint(int actionPoint);
+    // void setActionPoint(int actionPoint);
+
+    // get and set the sight range of unit
+    int getSightRange() const;
+    // void setSightRange(int sr);
 
 private:
     // Position in the field
     int row{};
     int col{};
-    bool side;
+    bool side{true};
     UnitType type;
     PatrolDirection pDir;
-    int actionPoint{};
+    int actionPoint{3};
+    int sightRange{};
 };
 
 std::string getUnitSymbol(const Unit& u);

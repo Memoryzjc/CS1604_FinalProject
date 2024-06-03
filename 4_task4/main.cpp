@@ -22,7 +22,6 @@ int main(int argc, char* argv[])
     play(*f, cin, cout,units);
 
     delete f;
-    for (auto & unit : units) delete unit;
 
     return 0;
 }

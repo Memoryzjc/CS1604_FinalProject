@@ -12,14 +12,25 @@ using namespace std;
 
 bool debugMode = true;
 
+// judge whether a string is all composed of digit and is not empty
+bool isDigit(string s) {
+    if (s.empty()) return false;
+
+    for (char c : s) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
+
 // Load map and units
 Field* loadMap(istream& is)
 {
-    int row, col, tNum, mNum, gNum;
+    int row, col, tNum = -1, mNum = -1, gNum = -1;
     string line;
     getline(is, line);
     istringstream iss1(line);
     iss1 >> row >> col >> tNum >> mNum >> gNum;
+    if (tNum < 0 || mNum < 0 || gNum < 0) return nullptr;
 
     Field *battlefield;
     battlefield = new Field(row, col);
@@ -27,19 +38,20 @@ Field* loadMap(istream& is)
 
     while (true) {
         count++;
+        if (count > tNum + mNum + gNum + 1) break;
+
         getline(is, line);
         istringstream iss2(line);
-        if (count == 47)
-            count = 47;
+
         if (count <= tNum + 1) {
-            int tRow, tCol;
-            char terrain;
+            string tRow, tCol, terrain;
             Terrain t;
             iss2 >> tRow >> tCol >> terrain;
 
-            if (terrain != 'W' && terrain != 'M') return nullptr;
+            if (!isDigit(tRow) || !isDigit(tCol)) return nullptr;
+            if ((terrain[0] != 'W' && terrain[0] != 'M') || terrain.length() != 1) return nullptr;
 
-            switch (terrain) {
+            switch (terrain[0]) {
                 case('W'):
                     t = WATER;
                     break;
@@ -50,27 +62,34 @@ Field* loadMap(istream& is)
                     t = PLAIN;
                     break;
             }
-            battlefield->setTerrain(tRow, tCol, t);
+
+            if (battlefield->getTerrain(stoi(tRow), stoi(tCol)) != PLAIN) return nullptr;
+            else battlefield->setTerrain(stoi(tRow), stoi(tCol), t);
         } else if (count > tNum + 1 && count <= tNum + mNum + 1) {
-            int mRow, mCol;
-            iss2 >> mRow >> mCol;
-            Unit u(true, mRow, mCol);
-            battlefield->setUnit(mRow, mCol, &u);
+            string mRow, mCol, check;
+            iss2 >> mRow >> mCol >> check;
+
+            // guarantee mRow and mCol are digits and not empty
+            if (!isDigit(mRow) || !isDigit(mCol)) return nullptr;
+            // guarantee input is the mage's form
+            if (!check.empty()) return nullptr;
+
+            Unit *u = new Unit(true, stoi(mRow), stoi(mCol));
+
+            // if (mRow, mCol) is occupied, return nullptr
+            if(!battlefield->setUnit(stoi(mRow), stoi(mCol), u)) return nullptr;
         } else {
-            int gRow, gCol;
-            string t;
+            string gRow, gCol, t;
             iss2 >> gRow >> gCol >> t;
 
             if (t != "PG") return nullptr;
 
-            Unit u(false, gRow, gCol);
-            battlefield->setUnit(gRow, gCol, &u);
+            if (!isDigit(gRow) || !isDigit(gCol)) return nullptr;
+
+            Unit *u = new Unit(false, stoi(gRow), stoi(gCol));
+            if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
         }
-
-        if (count == tNum + mNum + gNum + 1) break;
     }
-
-
     return battlefield;
 }
 
@@ -93,7 +112,6 @@ void play(Field& field, istream& is, ostream& os, Vector<Unit*>& units)
         // string line;
         // if (!getline(is,line)) break;
         break;
-        numTurns++;
     }
 }
 

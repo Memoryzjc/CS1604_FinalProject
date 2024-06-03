@@ -14,14 +14,25 @@ bool debugMode = true;
 
 enum Site {UL = 0, U, UR, L, R, DL, D, DR};
 
+// judge whether a string is all composed of digit and is not empty
+bool isDigit(string s) {
+    if (s.empty()) return false;
+
+    for (char c : s) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
+
 // Load map and units
 Field* loadMap(istream& is, Vector<Unit*>& units)
 {
-    int row, col, tNum, mNum, gNum;
+    int row, col, tNum = -1, mNum = -1, gNum = -1;
     string line;
     getline(is, line);
     istringstream iss1(line);
     iss1 >> row >> col >> tNum >> mNum >> gNum;
+    if (tNum < 0 || mNum < 0 || gNum < 0) return nullptr;
 
     Field *battlefield;
     battlefield = new Field(row, col);
@@ -34,14 +45,15 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
         getline(is, line);
         istringstream iss2(line);
         if (count <= tNum + 1) {  // generate terrains
-            int tRow, tCol;
-            char terrain;
+            string tRow, tCol, terrain;
             Terrain t;
             iss2 >> tRow >> tCol >> terrain;
 
-            if (terrain != 'M' && terrain != 'W') return nullptr;
+            if (!isDigit(tRow) || !isDigit(tCol)) return nullptr;
+            // guarantee terrain is 'W' or 'M'
+            if ((terrain[0] != 'W' && terrain[0] != 'M') || terrain.length() != 1) return nullptr;
 
-            switch (terrain) {
+            switch (terrain[0]) {
                 case('W'):
                     t = WATER;
                     break;
@@ -53,23 +65,34 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
                     break;
             }
 
-            battlefield->setTerrain(tRow, tCol, t);
+            if (battlefield->getTerrain(stoi(tRow), stoi(tCol)) != PLAIN) return nullptr;
+            else battlefield->setTerrain(stoi(tRow), stoi(tCol), t);
         } else if (count > tNum + 1 && count <= tNum + mNum + 1) {
-            int mRow, mCol;  // generate mages
-            iss2 >> mRow >> mCol;
-            Unit *u = new Unit(true, mRow, mCol);
-            units.add(u);  // add mages to the units
-            battlefield->setUnit(mRow, mCol, u);
+            string mRow, mCol, check;
+            iss2 >> mRow >> mCol >> check;
+
+            // guarantee mRow and mCol are digits and not empty
+            if (!isDigit(mRow) || !isDigit(mCol)) return nullptr;
+            // guarantee input is the mage's form
+            if (!check.empty()) return nullptr;
+
+            Unit *u = new Unit(true, stoi(mRow), stoi(mCol));
+
+            // add mages to the units
+            units.add(u);
+            // if (mRow, mCol) is occupied, return nullptr
+            if(!battlefield->setUnit(stoi(mRow), stoi(mCol), u)) return nullptr;
         } else {
-            int gRow, gCol;  // generate goblins
-            string t;
+            // generate goblins
+            string gRow, gCol, t;
             iss2 >> gRow >> gCol >> t;
 
+            if (!isDigit(gRow) || !isDigit(gCol)) return nullptr;
             if (t != "PG") return nullptr;
 
-            Unit *u = new Unit(false, gRow, gCol);
+            Unit *u = new Unit(false, stoi(gRow), stoi(gCol));
             units.add(u);  // add mages to the units
-            battlefield->setUnit(gRow, gCol, u);
+            if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
         }
 
     }

@@ -12,6 +12,16 @@ bool debugMode = true;
 
 enum Site {UL = 0, U, UR, L, R, DL, D, DR};
 
+// judge whether a string is all composed of digit and is not empty
+bool isDigit(string s) {
+    if (s.empty()) return false;
+
+    for (char c : s) {
+        if (!isdigit(c)) return false;
+    }
+    return true;
+}
+
 
 // need to find all the situation that will lead to failure
 // Load map and units
@@ -22,7 +32,6 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
     getline(is, line);
     istringstream iss1(line);
     iss1 >> row >> col >> tNum >> mNum >> gNum;
-
     if (tNum < 0 || mNum < 0 || gNum < 0) return nullptr;
 
     Field *battlefield;
@@ -36,14 +45,16 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
         getline(is, line);
         istringstream iss2(line);
         if (count <= tNum + 1) {  // generate terrains
-            int tRow, tCol;
-            char terrain;
+            string tRow, tCol, terrain;
             Terrain t;
             iss2 >> tRow >> tCol >> terrain;
 
-            if (terrain != 'W' && terrain != 'M') return nullptr;
+            // guarantee tRow and tCol is integer
+            if (!isDigit(tRow) || !isDigit(tCol)) return nullptr;
+            // guarantee terrain is 'W' or 'M'
+            if ((terrain[0] != 'W' && terrain[0] != 'M') || terrain.length() != 1) return nullptr;
 
-            switch (terrain) {
+            switch (terrain[0]) {
                 case('W'):
                     t = WATER;
                     break;
@@ -55,41 +66,66 @@ Field* loadMap(istream& is, Vector<Unit*>& units)
                     break;
             }
 
-            battlefield->setTerrain(tRow, tCol, t);
+            // if (tRow, tCol) has already occupied by special terrain, map fails to load
+            if (battlefield->getTerrain(stoi(tRow), stoi(tCol)) != PLAIN) return nullptr;
+            else battlefield->setTerrain(stoi(tRow), stoi(tCol), t);
         }
         else if (count > tNum + 1 && count <= tNum + mNum + 1) {
-            int mRow, mCol;  // generate mages
-            iss2 >> mRow >> mCol;
-            Unit *u = new Unit(true, mRow, mCol);
-            units.add(u);  // add mages to the units
-            battlefield->setUnit(mRow, mCol, u);
+            // generate mages
+            string mRow, mCol, check;
+            iss2 >> mRow >> mCol >> check;
+
+            // guarantee mRow and mCol are digits and not empty
+            if (!isDigit(mRow) || !isDigit(mCol)) return nullptr;
+            // guarantee input is the mage's form
+            if (!check.empty()) return nullptr;
+
+            Unit *u = new Unit(true, stoi(mRow), stoi(mCol));
+
+            // add mages to the units
+            units.add(u);
+            // if (mRow, mCol) is occupied, return nullptr
+            if(!battlefield->setUnit(stoi(mRow), stoi(mCol), u)) return nullptr;
         }
         else {
-            int gRow, gCol, ap = 0, sightRange;  // generate goblins
-            string t;
-            char dir;
+            // generate goblins
+            string gRow, gCol, ap, sightRange, t, dir;
 
             iss2 >> gRow >> gCol >> t;
+            // guarantee gRow and gCol are digits
+            if (!isDigit(gRow) || !isDigit(gCol)) return nullptr;
 
             if (t == "PG") {
                 iss2 >> dir >> ap;
-                Unit *u = new Unit(false, gRow, gCol, Patrol,
-                                   static_cast<PatrolDirection>(dir), ap);
+
+                // guarantee ap is digit and dir is a char
+                if (!isDigit(ap) || dir.length() != 1) return nullptr;
+                // guarantee dir is a valid direction
+                if (dir[0] != 'W' && dir[0] != 'A' &&
+                    dir[0] != 'S' && dir[0] != 'D') return nullptr;
+
+                Unit *u = new Unit(false, stoi(gRow), stoi(gCol), Patrol,
+                                   static_cast<PatrolDirection>(dir[0]), stoi(ap));
                 units.add(u);  // add mages to the units
-                battlefield->setUnit(gRow, gCol, u);
+
+                // guarantee (gRow, gCol) is not occupied
+                if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
             }
             else if (t == "TG") {
                 iss2 >> sightRange;
-                Unit *u = new Unit(false, gRow, gCol, Tracking, sightRange);
+
+                // guarantee sightRange is digit
+                if(!isDigit(sightRange)) return nullptr;
+
+                Unit *u = new Unit(false, stoi(gRow), stoi(gCol), Tracking, stoi(sightRange));
+
                 units.add(u);  // add mages to the units
-                battlefield->setUnit(gRow, gCol, u);
+                if (!battlefield->setUnit(stoi(gRow), stoi(gCol), u)) return nullptr;
             }
-            else return nullptr;
+            else return nullptr;  // guarantee t equals PG or TG
         }
 
     }
-
-
     return battlefield;
 }
 
@@ -773,7 +809,11 @@ void play(Field& field, istream& is, ostream& os, Vector<Unit*>& units)
         // Print the new map
         os << field << endl;
 
-        if (playerWin(units)) {
+        if (units.isEmpty()) {
+            cout << "A Draw!";
+            break;
+        }
+        else if (playerWin(units)) {
             cout << "You Win!";
             break;
         }
